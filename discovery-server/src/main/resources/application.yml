@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: discovery-server
+
+server:
+  port: 8761
+
+eureka:
+  client:
+    register-with-eureka: false
+    fetch-registry: false
+  server:
+    enable-self-preservation: false
+    eviction-interval-timer-in-ms: 2000
+    response-cache-update-interval-ms: 1000
+    response-cache-auto-expiration-in-seconds: 5
+    use-read-only-response-cache: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      # Collector (Jaeger) OTLP/HTTP endpoint. Compose sets OTLP_ENDPOINT=http://jaeger:4318/v1/traces.
+      # With no collector running, spans are dropped and export errors are only logged.
+      endpoint: ${OTLP_ENDPOINT:http://localhost:4318/v1/traces}

@@ -1,0 +1,59 @@
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: order-service
+              uri: lb://order-service
+              predicates:
+                - Path=/orders/**
+            - id: restaurant-service
+              uri: lb://restaurant-service
+              predicates:
+                - Path=/restaurants/**,/tickets/**
+            - id: delivery-service
+              uri: lb://delivery-service
+              predicates:
+                - Path=/drivers/**,/deliveries/**
+
+server:
+  port: 8000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  tracing:
+    sampling:
+      probability: 1.0
+  otlp:
+    tracing:
+      # Collector (Jaeger) OTLP/HTTP endpoint. Compose sets OTLP_ENDPOINT=http://jaeger:4318/v1/traces.
+      # With no collector running, spans are dropped and export errors are only logged.
+      endpoint: ${OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+eureka:
+  client:
+    enabled: ${EUREKA_ENABLED:false}
+    register-with-eureka: ${EUREKA_ENABLED:false}
+    fetch-registry: ${EUREKA_ENABLED:false}
+    registry-fetch-interval-seconds: 5
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${random.value}
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 15
+    metadata-map:
+      prometheus.path: /actuator/prometheus

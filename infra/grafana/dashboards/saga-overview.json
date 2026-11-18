@@ -1,0 +1,52 @@
+{
+  "uid": "saga-overview",
+  "title": "Saga overview",
+  "tags": ["saga", "kafka"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-30m", "to": "now" },
+  "panels": [
+    {
+      "id": 1, "type": "timeseries", "title": "Consumer lag by group and topic",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        { "refId": "A", "expr": "sum by (consumergroup, topic) (kafka_consumergroup_lag)", "legendFormat": "{{consumergroup}} / {{topic}}" }
+      ]
+    },
+    {
+      "id": 2, "type": "timeseries", "title": "Consume rate (records/s) by group and topic",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        { "refId": "A", "expr": "sum by (consumergroup, topic) (rate(kafka_consumergroup_current_offset[1m]))", "legendFormat": "{{consumergroup}} / {{topic}}" }
+      ]
+    },
+    {
+      "id": 3, "type": "timeseries", "title": "Outbox pending rows",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "targets": [
+        { "refId": "A", "expr": "max by (application) (outbox_pending)", "legendFormat": "{{application}}" }
+      ]
+    },
+    {
+      "id": 4, "type": "stat", "title": "DLT records (total)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "targets": [
+        { "refId": "A", "expr": "sum(kafka_dlt_records_total) or vector(0)", "legendFormat": "DLT records" }
+      ]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "HTTP request p95 (s)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le, application) (rate(http_server_requests_seconds_bucket[1m])))", "legendFormat": "{{application}}" }
+      ]
+    }
+  ]
+}
