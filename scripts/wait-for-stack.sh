@@ -43,6 +43,18 @@ check_all() {
   if [[ "$code" != "200" ]]; then
     echo "GET $GATEWAY/restaurants returned '$code', expected 200"; return 1
   fi
+  # The gateway's load-balancer cache can still hold an older, shorter instance list after Eureka
+  # already shows N; the stack is only ready once the gateway actually spreads calls (N > 1).
+  if (( N > 1 )); then
+    local ids
+    ids=$(for _ in $(seq 1 12); do
+            curl -s -m 5 -D - -o /dev/null "$GATEWAY/restaurants" 2>/dev/null | tr -d '\r' \
+              | grep -i '^x-instance-id:' | cut -d' ' -f2
+          done | sort -u | grep -c . || true)
+    if (( ids < 2 )); then
+      echo "gateway spread 12 calls over $ids restaurant instance(s), expected >= 2"; return 1
+    fi
+  fi
   # M10 checks (only when the `obs` profile is running; otherwise skipped)
   if obs_running; then
     local ready

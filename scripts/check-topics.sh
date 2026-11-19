@@ -8,12 +8,16 @@ cd "$(dirname "$0")/.."
 
 COMPOSE=(docker compose)
 SVC=kafka
+BOOT=localhost:9092
 RF=1
 PRODLIKE=0
 if [[ "${1:-}" == "--prodlike" ]]; then
   PRODLIKE=1
   COMPOSE=(docker compose -f docker-compose.prodlike.yml)
   SVC=kafka-1
+  # Internal listener: on PLAINTEXT_HOST, brokers 2/3 advertise localhost:9094/9096, which do not exist
+  # inside the kafka-1 container.
+  BOOT=kafka-1:29092
   RF=3
 fi
 KT=/opt/kafka/bin/kafka-topics.sh
@@ -54,7 +58,7 @@ else
 fi
 
 # 2. Describe topics.
-DESC=$("${COMPOSE[@]}" exec -T "$SVC" "$KT" --bootstrap-server localhost:9092 --describe 2>&1 | tr -d '\r') || {
+DESC=$("${COMPOSE[@]}" exec -T "$SVC" "$KT" --bootstrap-server "$BOOT" --describe 2>&1 | tr -d '\r') || {
   echo "$DESC"; fail "kafka-topics --describe failed"; echo "RESULT: FAIL ($FAILS failed)"; exit 1; }
 # "name partitions rf" per topic, internal topics excluded.
 ACTUAL=$(printf '%s\n' "$DESC" | grep -E '^Topic: ' | grep -v -E '^Topic: __' \
@@ -82,7 +86,7 @@ done < <(expected)
 # 3. Broker config / min ISR.
 if (( PRODLIKE )); then
   for t in order.events restaurant.events delivery.events; do
-    cfg=$("${COMPOSE[@]}" exec -T "$SVC" "$KC" --bootstrap-server localhost:9092 --describe \
+    cfg=$("${COMPOSE[@]}" exec -T "$SVC" "$KC" --bootstrap-server "$BOOT" --describe \
       --entity-type topics --entity-name "$t" 2>&1 | tr -d '\r') || true
     if grep -q 'min.insync.replicas=2' <<<"$cfg"; then
       pass "$t min.insync.replicas=2"
@@ -91,7 +95,7 @@ if (( PRODLIKE )); then
     fi
   done
 fi
-cfg=$("${COMPOSE[@]}" exec -T "$SVC" "$KC" --bootstrap-server localhost:9092 --describe \
+cfg=$("${COMPOSE[@]}" exec -T "$SVC" "$KC" --bootstrap-server "$BOOT" --describe \
   --entity-type brokers --entity-name 1 --all 2>&1 | tr -d '\r') || true
 if grep -q 'auto.create.topics.enable=false' <<<"$cfg"; then
   pass "auto.create.topics.enable=false"

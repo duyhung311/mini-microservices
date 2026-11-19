@@ -3,6 +3,7 @@ package com.example.fooddelivery.delivery.api;
 import com.example.fooddelivery.delivery.domain.BadRequestException;
 import com.example.fooddelivery.delivery.domain.ConflictException;
 import com.example.fooddelivery.delivery.domain.NotFoundException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -21,6 +22,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(ConflictException.class)
     public ProblemDetail conflict(ConflictException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
+    }
+
+    /** Deadlock or lock timeout between concurrent transactions: safe for the client to retry. */
+    @ExceptionHandler(PessimisticLockingFailureException.class)
+    public ProblemDetail lockConflict(PessimisticLockingFailureException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "Concurrent update in progress; retry");
     }
 
     @ExceptionHandler(BadRequestException.class)

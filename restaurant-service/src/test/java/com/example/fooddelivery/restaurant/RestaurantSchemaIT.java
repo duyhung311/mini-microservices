@@ -13,12 +13,12 @@ import org.junit.jupiter.api.Test;
 /** Criterion 13: Flyway creates exactly the spec section 9 restaurant-db tables and columns plus documented additions. */
 class RestaurantSchemaIT extends RestaurantIntegrationTestBase {
 
-    /** Spec section 9 columns plus the additive ones (kitchen_tickets.correlation_id, cause_event_id). */
+    /** Spec section 9 columns plus the additive ones (kitchen_tickets.correlation_id). */
     private static final Map<String, Set<String>> EXPECTED = Map.of(
             "restaurants", Set.of("id", "name", "address", "is_open", "max_concurrent_orders"),
             "menu_items", Set.of("id", "restaurant_id", "name", "price", "available"),
             "kitchen_tickets", Set.of("id", "order_id", "restaurant_id", "status", "created_at",
-                    "correlation_id", "cause_event_id"),
+                    "correlation_id"),
             "outbox", Set.of("id", "aggregate_id", "event_type", "payload", "created_at", "published_at",
                     "traceparent"),
             "processed_events", Set.of("event_id", "processed_at"));

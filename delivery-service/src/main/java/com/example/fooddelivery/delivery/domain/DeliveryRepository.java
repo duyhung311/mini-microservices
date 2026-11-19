@@ -14,12 +14,11 @@ public interface DeliveryRepository extends JpaRepository<Delivery, UUID> {
     Optional<Delivery> findByOrderId(UUID orderId);
 
     @Modifying
-    @Query(value = "INSERT INTO deliveries (id, order_id, status, dropoff_address, correlation_id, last_event_id,"
-            + " created_at, updated_at) VALUES (:id, :orderId, 'PENDING', :dropoff, :correlationId, :eventId,"
+    @Query(value = "INSERT INTO deliveries (id, order_id, status, dropoff_address, correlation_id,"
+            + " created_at, updated_at) VALUES (:id, :orderId, 'PENDING', :dropoff, :correlationId,"
             + " now(), now()) ON CONFLICT (order_id) DO NOTHING", nativeQuery = true)
     int insertPendingIfAbsent(@Param("id") UUID id, @Param("orderId") UUID orderId,
-                              @Param("dropoff") String dropoff, @Param("correlationId") UUID correlationId,
-                              @Param("eventId") UUID eventId);
+                              @Param("dropoff") String dropoff, @Param("correlationId") UUID correlationId);
 
     @Query(value = "SELECT * FROM deliveries WHERE order_id = :orderId FOR UPDATE", nativeQuery = true)
     Optional<Delivery> lockByOrderId(@Param("orderId") UUID orderId);

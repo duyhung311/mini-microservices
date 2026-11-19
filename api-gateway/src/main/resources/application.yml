@@ -2,6 +2,10 @@ spring:
   application:
     name: api-gateway
   cloud:
+    loadbalancer:
+      cache:
+        # default 35 s; keep it short so scaled-up instances (and the Eureka 5 s fetch) reach the gateway quickly
+        ttl: 5s
     gateway:
       server:
         webflux:

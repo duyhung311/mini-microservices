@@ -88,7 +88,9 @@ public class OrderService {
     /** Customer cancel. 404 if unknown, {@link OrderStateConflictException} (409) if not cancellable. */
     @Transactional
     public Order cancel(UUID id) {
-        Order order = orders.findById(id).orElseThrow(() -> new OrderNotFoundException(id));
+        // Row lock (not just @Version): a concurrent applyEvent or timeout makes cancel wait and then decide on the
+        // committed state (200 or 409) instead of failing the save with an optimistic-lock error (HTTP 500).
+        Order order = orders.findByIdForUpdate(id).orElseThrow(() -> new OrderNotFoundException(id));
         OrderStateMachine.Decision d = OrderStateMachine.decide(order.getStatus(), order.getDriverId() != null,
                 false, OrderInput.CUSTOMER_CANCEL);
         if (!(d instanceof OrderStateMachine.Apply)) {

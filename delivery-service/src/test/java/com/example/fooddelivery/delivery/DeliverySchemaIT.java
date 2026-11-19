@@ -55,8 +55,7 @@ class DeliverySchemaIT extends DeliveryIntegrationTestBase {
                 Map.entry("dropoff_address", "character varying/YES"),
                 Map.entry("created_at", "timestamp with time zone/NO"),
                 Map.entry("updated_at", "timestamp with time zone/NO"),
-                Map.entry("correlation_id", "uuid/NO"),
-                Map.entry("last_event_id", "uuid/NO")));
+                Map.entry("correlation_id", "uuid/NO")));
     }
 
     @Test

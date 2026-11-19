@@ -213,7 +213,12 @@ class OrderTimeoutIT extends AbstractOrderIT {
             Future<Integer> fa = pool.submit(a);
             Future<Integer> fb = pool.submit(b);
             int total = fa.get(30, TimeUnit.SECONDS) + fb.get(30, TimeUnit.SECONDS);
+            // total also counts other tests' stale PLACED orders; count only the cancels of these 10 ids (a double cancel gives >10)
             assertThat(total).isGreaterThanOrEqualTo(ids.size());
+            int ownCancels = jdbc.queryForObject("select count(*) from order_status_history where to_status = 'CANCELLED' "
+                    + "and order_id in (" + ids.stream().map(i -> "'" + i + "'").collect(Collectors.joining(",")) + ")",
+                    Integer.class);
+            assertThat(ownCancels).isEqualTo(ids.size());
         } finally {
             pool.shutdownNow();
         }

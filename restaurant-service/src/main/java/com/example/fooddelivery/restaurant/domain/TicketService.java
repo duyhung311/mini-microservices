@@ -60,7 +60,14 @@ public class TicketService {
             return;
         }
         OrderPlaced placed = (OrderPlaced) EventCodec.payloadOf(envelope);
-        if (tickets.findByOrderId(envelope.orderId()).isPresent()) {
+        Optional<KitchenTicket> existing = tickets.findByOrderId(envelope.orderId());
+        if (existing.isPresent() && existing.get().getStatus() == TicketStatus.CANCELLED) {
+            // CANCELLED is terminal: OrderCancelled overtook this OrderPlaced (e.g. it was retried). No decision event.
+            log.info("OrderPlaced for order {} which is already CANCELLED; ignoring (eventId={})",
+                    envelope.orderId(), envelope.eventId());
+            return;
+        }
+        if (existing.isPresent()) {
             log.warn("OrderPlaced for order {} which already has a ticket; skipping (eventId={})",
                     envelope.orderId(), envelope.eventId());
             return;
@@ -86,7 +93,7 @@ public class TicketService {
             return;
         }
         tickets.save(new KitchenTicket(envelope.orderId(), placed.restaurantId(), envelope.correlationId(),
-                envelope.eventId(), Instant.now()));
+                Instant.now()));
         log.info("Accepted order {}", envelope.orderId());
         publish(envelope, EventTypes.ORDER_ACCEPTED,
                 new OrderAccepted(placed.restaurantId(), prepMinutes, restaurant.get().getAddress()));
@@ -116,7 +123,10 @@ public class TicketService {
         }
         Optional<KitchenTicket> found = tickets.findForUpdateByOrderId(envelope.orderId());
         if (found.isEmpty()) {
-            log.info("OrderCancelled for order {} without a ticket; skipping", envelope.orderId());
+            // Tombstone: a later OrderPlaced for this order must not create an ACCEPTED ticket.
+            tickets.save(KitchenTicket.tombstone(envelope.orderId(), envelope.correlationId(), Instant.now()));
+            log.info("OrderCancelled for order {} without a ticket; recorded a CANCELLED tombstone",
+                    envelope.orderId());
             return;
         }
         KitchenTicket ticket = found.get();
@@ -151,6 +161,7 @@ public class TicketService {
     @Transactional
     public KitchenTicket markReady(UUID orderId) {
         KitchenTicket ticket = tickets.findForUpdateByOrderId(orderId)
+                .filter(t -> t.getRestaurantId() != null)
                 .orElseThrow(() -> new TicketNotFoundException(orderId));
         if (ticket.getStatus() != TicketStatus.ACCEPTED) {
             throw new TicketConflictException(orderId, ticket.getStatus());
@@ -169,7 +180,8 @@ public class TicketService {
 
     @Transactional(readOnly = true)
     public Optional<KitchenTicket> find(UUID orderId) {
-        return tickets.findByOrderId(orderId);
+        // tombstones (no restaurant) are not tickets the API exposes
+        return tickets.findByOrderId(orderId).filter(t -> t.getRestaurantId() != null);
     }
 
     private void becomeReady(KitchenTicket ticket) {

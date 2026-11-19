@@ -25,20 +25,24 @@ public class KitchenTicket {
     private Instant createdAt;
     @Column(name = "correlation_id")
     private UUID correlationId;
-    @Column(name = "cause_event_id")
-    private UUID causeEventId;
+
+    /** CANCELLED row recorded when OrderCancelled is handled before its OrderPlaced; restaurant is unknown (null). */
+    public static KitchenTicket tombstone(UUID orderId, UUID correlationId, Instant createdAt) {
+        KitchenTicket ticket = new KitchenTicket(orderId, null, correlationId, createdAt);
+        ticket.status = TicketStatus.CANCELLED;
+        return ticket;
+    }
 
     protected KitchenTicket() {
     }
 
-    public KitchenTicket(UUID orderId, UUID restaurantId, UUID correlationId, UUID causeEventId, Instant createdAt) {
+    public KitchenTicket(UUID orderId, UUID restaurantId, UUID correlationId, Instant createdAt) {
         this.id = UUID.randomUUID();
         this.orderId = orderId;
         this.restaurantId = restaurantId;
         this.status = TicketStatus.ACCEPTED;
         this.createdAt = createdAt;
         this.correlationId = correlationId;
-        this.causeEventId = causeEventId;
     }
 
     public UUID getId() { return id; }
@@ -48,5 +52,4 @@ public class KitchenTicket {
     public void setStatus(TicketStatus status) { this.status = status; }
     public Instant getCreatedAt() { return createdAt; }
     public UUID getCorrelationId() { return correlationId; }
-    public UUID getCauseEventId() { return causeEventId; }
 }

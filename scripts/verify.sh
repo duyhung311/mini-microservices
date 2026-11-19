@@ -40,8 +40,12 @@ if (( ${#paths[@]} )); then
 fi
 echo "no CR characters found"
 
-banner 3 "./mvnw -B verify"
-./mvnw -B verify
+banner 3 "./mvnw -B clean install (clean: an IDE language server can leave stale classes in target/; runs all tests; install refreshes ~/.m2 for the -pl e2e-tests step)"
+# The ITs start their own Testcontainers Kafka/Postgres and up to 3 Spring contexts. A running apps/obs stack
+# competes for Docker RAM and made the multi-instance ITs time out, so stop it first (step 6 starts it again).
+docker compose --profile apps --profile obs stop > /dev/null 2>&1 || true
+docker compose up -d > /dev/null 2>&1 || true
+./mvnw -B clean install
 
 banner 4 "KafkaTemplate only in outbox packages and KafkaConfig"
 dirs=()

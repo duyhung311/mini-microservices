@@ -20,7 +20,11 @@ final class EventDispatch {
     /** Decodes and applies. Poison records throw {@link InvalidEventException} (not retried, straight to the DLT). */
     static void dispatch(ConsumerRecord<String, String> record, OrderService orderService) {
         EventEnvelope env = EventCodec.fromJson(record.value());
+        if (env.eventVersion() != 1) {
+            throw new InvalidEventException("Unsupported eventVersion " + env.eventVersion());
+        }
         checkHeader(record, EventHeaders.EVENT_TYPE, env.eventType());
+        checkHeader(record, EventHeaders.EVENT_VERSION, String.valueOf(env.eventVersion()));
         checkHeader(record, EventHeaders.CORRELATION_ID, String.valueOf(env.correlationId()));
         try (TraceLinks.Binding ignored = TraceLinks.bindCorrelation(env.correlationId())) {
             orderService.applyEvent(env);
@@ -30,7 +34,7 @@ final class EventDispatch {
     private static void checkHeader(ConsumerRecord<String, String> record, String name, String expected) {
         Header h = record.headers().lastHeader(name);
         if (h == null) {
-            return;
+            throw new InvalidEventException("Missing header " + name);
         }
         String actual = EventHeaders.text(h.value());
         if (!expected.equals(actual)) {

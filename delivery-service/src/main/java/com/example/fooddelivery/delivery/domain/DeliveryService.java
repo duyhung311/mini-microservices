@@ -74,12 +74,10 @@ public class DeliveryService {
             case ASSIGNED, READY_FOR_PICKUP -> {
                 releaseDriver(d);
                 d.transition(DeliveryStatus.CANCELLED);
-                d.setLastEventId(env.eventId());
                 log.info("OrderCancelled orderId={} delivery cancelled, driver released", env.orderId());
             }
             case PENDING -> {
                 d.transition(DeliveryStatus.CANCELLED);
-                d.setLastEventId(env.eventId());
                 log.info("OrderCancelled orderId={} tombstone/cancel of pending delivery", env.orderId());
             }
             case PICKED_UP, DELIVERED -> log.warn(
@@ -100,7 +98,6 @@ public class DeliveryService {
             return;
         }
         d.setPickupAddress(accepted.pickupAddress());
-        d.setLastEventId(env.eventId());
         Optional<Driver> driver = drivers.lockFirstAvailable();
         if (driver.isPresent()) {
             Driver dr = driver.get();
@@ -130,7 +127,6 @@ public class DeliveryService {
         }
         Delivery d = found.get();
         d.transition(DeliveryStatus.READY_FOR_PICKUP);
-        d.setLastEventId(env.eventId());
     }
 
     // ---------------------------------------------------------------- REST operations
@@ -156,6 +152,15 @@ public class DeliveryService {
         }
         Delivery active = deliveries.lockActiveByDriver(id).orElse(null);
         Driver driver = drivers.lockById(id).orElseThrow(() -> new NotFoundException("No driver " + id));
+        if (active == null && driver.getStatus() == DriverStatus.BUSY) {
+            // An assignment (onOrderAccepted) may have committed while we waited for the driver lock; its
+            // delivery row was invisible to the first query. Look again. This takes the delivery lock while
+            // holding the driver lock (reverse of the usual order); onOrderAccepted never waits on a driver row
+            // (FOR UPDATE SKIP LOCKED) so it cannot deadlock with us. A remaining cycle needs a handler that
+            // locked the just-assigned delivery and then waits for this driver; Postgres aborts one side with a
+            // deadlock error, which the REST layer maps to 409 and Kafka handlers retry.
+            active = deliveries.lockActiveByDriver(id).orElse(null);
+        }
         if (driver.getStatus() != DriverStatus.BUSY) {
             driver.setStatus(target);
             return driver;
@@ -235,8 +240,7 @@ public class DeliveryService {
 
     /** Insert a PENDING row if none exists (race safe), then return it locked. */
     private Delivery lockOrCreate(EventEnvelope env, String dropoff) {
-        deliveries.insertPendingIfAbsent(UUID.randomUUID(), env.orderId(), dropoff, env.correlationId(),
-                env.eventId());
+        deliveries.insertPendingIfAbsent(UUID.randomUUID(), env.orderId(), dropoff, env.correlationId());
         return deliveries.lockByOrderId(env.orderId()).orElseThrow();
     }
 
@@ -254,13 +258,11 @@ public class DeliveryService {
     private void emit(Delivery d, EventEnvelope cause, String type, EventPayload payload) {
         EventEnvelope out = Envelopes.next(cause, type, payload);
         publisher.publish(out);
-        d.setLastEventId(out.eventId());
     }
 
     /** REST- and scheduler-originated event: causationId null, correlationId of the saga kept. */
     private void emitFirst(Delivery d, String type, EventPayload payload) {
         EventEnvelope out = Envelopes.first(type, d.getOrderId(), d.getCorrelationId(), payload);
         publisher.publish(out);
-        d.setLastEventId(out.eventId());
     }
 }

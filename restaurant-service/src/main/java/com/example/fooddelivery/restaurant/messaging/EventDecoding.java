@@ -18,14 +18,21 @@ final class EventDecoding {
         EventEnvelope envelope = EventCodec.fromJson(record.value());
         // Validates the payload against the event type (throws InvalidEventException on mismatch).
         EventCodec.payloadOf(envelope);
+        if (envelope.eventVersion() != 1) {
+            throw new InvalidEventException("Unsupported eventVersion " + envelope.eventVersion());
+        }
         checkHeader(record, EventHeaders.EVENT_TYPE, envelope.eventType());
+        checkHeader(record, EventHeaders.EVENT_VERSION, String.valueOf(envelope.eventVersion()));
         checkHeader(record, EventHeaders.CORRELATION_ID, String.valueOf(envelope.correlationId()));
         return envelope;
     }
 
     private static void checkHeader(ConsumerRecord<String, String> record, String name, String expected) {
         Header header = record.headers().lastHeader(name);
-        if (header != null && !Objects.equals(EventHeaders.text(header.value()), expected)) {
+        if (header == null) {
+            throw new InvalidEventException("Missing header " + name);
+        }
+        if (!Objects.equals(EventHeaders.text(header.value()), expected)) {
             throw new InvalidEventException("Header " + name + "=" + EventHeaders.text(header.value())
                     + " does not match envelope value " + expected);
         }

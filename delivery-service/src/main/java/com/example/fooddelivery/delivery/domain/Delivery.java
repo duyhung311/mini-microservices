@@ -40,9 +40,6 @@ public class Delivery {
     @Column(name = "correlation_id")
     private UUID correlationId;
 
-    @Column(name = "last_event_id")
-    private UUID lastEventId;
-
     protected Delivery() {
     }
 
@@ -98,13 +95,5 @@ public class Delivery {
 
     public UUID getCorrelationId() {
         return correlationId;
-    }
-
-    public UUID getLastEventId() {
-        return lastEventId;
-    }
-
-    public void setLastEventId(UUID lastEventId) {
-        this.lastEventId = lastEventId;
     }
 }
